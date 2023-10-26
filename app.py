@@ -1,9 +1,10 @@
-import pandas as pd
 import tools.funcs as funcs
 import gradio as gr
 
 """
-All versions 1.3 and before credited to Daniel Mead
+All development in versions 1.3 and before credited to Daniel Mead. Further improvements (by Sean Pedrick-Case) not annotated here - see Github commit messages.
+
+---
 V1.3
 Added ability to customise frame names and number
 
@@ -33,61 +34,18 @@ The list of data is then split into 3 randomly sized (20-40% each) frames, which
 Each item contains a property called group which indicates its ground truth grouping.
 
 """
-#### Opts
-num_people = 10000
-frames = 2 # names for frames
+#### Defaults
+num_people = 1000
+frames = 2 # number of data frames
 
-#num_repeats = [1, 2, 3, 4, 5] 
-#repeat_weights = [3, 6, 8, 9, 10] # Cumulative weights. Ie. 30% of 1 repeat, 30% chance of 2, 20% of 3
+def update_slider_if_value_greater_than_1(slider_1_value, slider_2_value):
 
-
-#data_frame_list, out_message = funcs.create_fake_df(num_people, frames, faker_country, add_group, overwrite_ground_truth)
-
-#print(out_message)
-
-#for n, frame in enumerate(data_frame_list):
-#    frame.to_csv(f"{frames[n]}_frame.csv")
-
-
-def detect_file_type(filename):
-    """Detect the file type based on its extension."""
-    if (filename.endswith('.csv')) | (filename.endswith('.csv.gz')) | (filename.endswith('.zip')):
-        return 'csv'
-    elif filename.endswith('.xlsx'):
-        return 'xlsx'
-    elif filename.endswith('.parquet'):
-        return 'parquet'
+    if (slider_1_value + slider_2_value) > 1:
+        out_value = round(1-slider_1_value,1)
     else:
-        raise ValueError("Unsupported file type.")
+        out_value = round(slider_2_value,1)
 
-def read_file(filename):
-    """Read the file based on its detected type."""
-    file_type = detect_file_type(filename)
-    
-    if file_type == 'csv':
-        return pd.read_csv(filename, low_memory=False)
-    elif file_type == 'xlsx':
-        return pd.read_excel(filename)
-    elif file_type == 'parquet':
-        return pd.read_parquet(filename)
-
-def put_columns_in_df(in_file):
-    new_choices = []
-    concat_choices = []
-    
-    for file in in_file:
-        df = read_file(file.name)
-        new_choices = list(df.columns)
-
-        concat_choices.extend(new_choices)     
-        
-    return gr.Dropdown(choices=concat_choices, value=concat_choices)
-
-def dummy_function(in_colnames):
-    """
-    A dummy function that exists just so that dropdown updates work correctly.
-    """
-    return None    
+    return gr.Slider.update(value=out_value)
 
 ''' Create the gradio interface '''
 
@@ -96,28 +54,33 @@ block = gr.Blocks(theme = gr.themes.Base())
 with block:
     gr.Markdown(
     """
-    # Create fake datasets
+    # Create dummy datasets
     """)
 
-    with gr.Row():
-        number_of_people = gr.Slider(label = "Number of people to create", value=num_people, minimum=1000, maximum=100000, step=1000)
+    with gr.Accordion(label="Number of data frames and people", open=True):
+        number_of_people = gr.Slider(label = "Number of people in each data frame", value=num_people, minimum=1000, maximum=200000, step=1000)
+        number_of_frames = gr.Slider(label = "Number of data frames", value=frames, minimum=1, maximum=10, step=1)
 
-        number_of_frames = gr.Slider(label = "Number of data frames to create", value=frames, minimum=1, maximum=10, step=1)
+    with gr.Accordion(label="Repeat people in or across data frames. Default = no repeated people", open=False):
+        percentage_overlap = gr.Slider(label = "What proportion of people are shared across all data frames?", value=0, minimum=0, maximum=1, step=0.05)
+        not_common_appear_once = gr.Dropdown(label = "Are people (not included in the group defined above) unique across all data frames? If no, people will be randomly sampled randomly from the master list and may appear multiple times or not at all across all datasets.", value="Yes", choices=["Yes", "No"])
+        percentage_duplicates = gr.Slider(label = "What proportion of each data frame is made up of duplicate people?", value=0, minimum=0, maximum=0.9, step=0.05)
 
-    with gr.Row():
-        percentage_overlap = gr.Slider(label = "What percentage of people in the smallest data frame are duplicated across all data frames?", value=1, minimum=0, maximum=1, step=0.1)
-
+    with gr.Accordion(label="Add typos or missing values to person details. Default = None", open=False):
+        noise_prob = gr.Slider(label="Probability of typos in each field", minimum=0, maximum=1, value=0, step = 0.05)
+        missing_prob = gr.Slider(label="Probability of each field being blank", minimum=0, maximum=1, value=0, step = 0.05)
         random_seed = gr.Number(label="Choose random seed", value=42)
-    
-    create_df_btn = gr.Button("Create fake data")
+
+    create_df_btn = gr.Button("Create dummy datasets")
     
     with gr.Row():
         output_summary = gr.Textbox(label="Output result")
         output_file = gr.File(label="Output file")
         
     # Updates to components
+    percentage_overlap.change(fn=update_slider_if_value_greater_than_1, inputs=[percentage_overlap, percentage_duplicates], outputs=[percentage_duplicates])
+    percentage_duplicates.change(fn=update_slider_if_value_greater_than_1, inputs=[percentage_duplicates, percentage_overlap], outputs=[percentage_overlap])
 
-    create_df_btn.click(fn=funcs.create_fake_df, inputs=[number_of_people, number_of_frames, percentage_overlap, random_seed],
-                        outputs=[output_file, output_summary], api_name="faker")
+    create_df_btn.click(fn=funcs.create_fake_df, inputs=[number_of_people, number_of_frames, percentage_overlap, random_seed, not_common_appear_once, percentage_duplicates, noise_prob, missing_prob], outputs=[output_file, output_summary], api_name="faker")
     
 block.queue(concurrency_count=1).launch(debug=True)
