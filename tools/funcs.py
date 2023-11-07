@@ -9,7 +9,7 @@ import typo
 faker_country = 'en_UK'
 add_group = True # whether to add group key to dfs
 
-def create_fake_df(num_people, frames, overlap_percentage, random_seed, not_common_appear_once, duplicates_percentage, noise_prob, missing_prob, faker_country=faker_country, add_group=add_group):
+def create_fake_df(num_people, frames, overlap_percentage, random_seed, not_common_appear_once, duplicates_percentage, noise_prob, missing_prob, entry_list, faker_country=faker_country, add_group=add_group):
 
     # Set random seed to predefined value
     Faker.seed(random_seed)
@@ -20,7 +20,7 @@ def create_fake_df(num_people, frames, overlap_percentage, random_seed, not_comm
     fake = Faker(faker_country, use_weighting=False) # Localise this for UK
     ### Main
     
-    people_master = create_people_master(num_people, fake, add_group, overlap_percentage, duplicates_percentage, random_seed, frames)
+    people_master = create_people_master(num_people, fake, add_group, overlap_percentage, duplicates_percentage, random_seed, frames, entry_list)
     people_master_df = pd.DataFrame(people_master)
 
     # Sample from the master range and generate
@@ -118,7 +118,7 @@ def sample_from_people_master_list(people_master, num_people, frame_name, duplic
 
     return frame
 
-def create_people_master(num_people, fake, add_group, overlap_percentage, duplicates_percentage, random_seed, frames):
+def create_people_master(num_people, fake, add_group, overlap_percentage, duplicates_percentage, random_seed, frames, entry_list):
     
     # Generate a list of fake cities that seem realistic
     cities, city_weights = create_cities_list(fake) 
@@ -135,12 +135,12 @@ def create_people_master(num_people, fake, add_group, overlap_percentage, duplic
     total_unique_people_across_all_frames = total_people_across_all_frames-common_people
 
     for person in range(0, common_people): # Generate people using Faker repo, should be self-explanatory
-        entry = create_fake_person(person, fake, cities, city_weights, is_common = True)
+        entry = create_fake_person(person, fake, cities, city_weights, entry_list, is_common = True)
         
         people_master.append(entry)
 
     for person in range(common_people, total_unique_people_across_all_frames): # Generate people using Faker repo, should be self-explanatory
-        entry = create_fake_person(person, fake, cities, city_weights, is_common = False)
+        entry = create_fake_person(person, fake, cities, city_weights, entry_list, is_common = False)
         
         people_master.append(entry)
     
@@ -207,33 +207,67 @@ def create_cities_list(fake):
         
         return cities, city_weights
 
-def create_fake_person(person, fake, cities, city_weights, is_common):
+def create_fake_person(person, fake, cities, city_weights, entry_list, is_common):
         add_group = True
 
+        entry_dict = {}
+
         if random.random() < 0.5: # Male
-            first_name = fake.first_name_male()
-            #title = fake.prefix_male()
+
+            if "First name" in entry_list:
+                first_name = fake.first_name_male()
+                entry_dict['First name'] =  first_name
+            
+            if "Title" in entry_list:
+                title = fake.prefix_male()
+                entry_dict['Title'] =  title
+
         else: # Female
-            first_name = fake.first_name_female()
-            #title = fake.prefix_female()
+            if "First name" in entry_list:
+                first_name = fake.first_name_female()
+                entry_dict['First name'] =  first_name
 
-        last_name = fake.last_name()
+            if "Title" in entry_list:
+                title = fake.prefix_female()
+                entry_dict['Title'] =  title
 
-        #if random.random() < 0.1:
-        #    first_name = title + " " + first_name
+        if "Last name" in entry_list:
+            last_name = fake.last_name()
+            entry_dict['Surname'] =  last_name
 
-        birth_date = fake.date_between(start_date=datetime.date(1950, 1, 1)).strftime(r"%d/%m/%Y")
-        address = fake.street_address()
-        pc = fake.postcode()
-        city = random.choices(cities, weights=city_weights, k=1)[0]
+        if "Full name" in entry_list:
+            if "Title" in entry_list:
+                full_name = title + " " + first_name + " " + last_name
 
-        address += "\n" + city
+            else:
+                full_name = first_name + " " + last_name
+            
+            entry_dict['Full name'] =  full_name
 
-        entry = {'First Name': first_name,
-                'Surname': last_name,
-                'Dob': birth_date,
-                'Address': address,
-                'Postcode': pc}
+        if "Date of birth" in entry_list:
+            birth_date = fake.date_between(start_date=datetime.date(1950, 1, 1)).strftime(r"%d/%m/%Y")
+            entry_dict['Date of birth'] =  birth_date
+
+        if "Address" in entry_list:
+            address = fake.street_address()
+            city = random.choices(cities, weights=city_weights, k=1)[0]
+            address += ", " + city
+
+            pc = fake.postcode()
+
+            entry_dict['Address'] =  address
+            entry_dict['Postcode'] =  pc
+
+        if "Email" in entry_list:
+            email = fake.ascii_free_email()
+            entry_dict['Email'] =  email
+            
+        if "Phone number" in entry_list:
+            phone = fake.phone_number()
+            entry_dict['Phone number'] =  phone
+                
+
+        entry = entry_dict
         if add_group:
                 entry.update({'group': person})
                 entry.update({'common':is_common})

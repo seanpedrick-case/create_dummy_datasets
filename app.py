@@ -71,6 +71,14 @@ with block:
         missing_prob = gr.Slider(label="Probability of each field being blank", minimum=0, maximum=1, value=0, step = 0.05)
         random_seed = gr.Number(label="Choose random seed", value=42)
 
+    with gr.Accordion(label="Additional fields to add to each data frame", open=False):
+        add_additional_fields = gr.CheckboxGroup(label = "Which additional fields are needed?", choices = ["First name", "Last name", "Date of birth", "Address", "Title", "Full name",  "Email", "Phone number"],
+                                                 value=["First name", "Last name", "Date of birth", "Address"])
+        # email = fake.providers.internet.free_email()
+        # phone = fake.providers.phone_number()
+        # title = fake.prefix_male()
+        # title = fake.prefix_female()
+
     create_df_btn = gr.Button("Create dummy datasets")
     
     with gr.Row():
@@ -81,6 +89,6 @@ with block:
     percentage_overlap.change(fn=update_slider_if_value_greater_than_1, inputs=[percentage_overlap, percentage_duplicates], outputs=[percentage_duplicates])
     percentage_duplicates.change(fn=update_slider_if_value_greater_than_1, inputs=[percentage_duplicates, percentage_overlap], outputs=[percentage_overlap])
 
-    create_df_btn.click(fn=funcs.create_fake_df, inputs=[number_of_people, number_of_frames, percentage_overlap, random_seed, not_common_appear_once, percentage_duplicates, noise_prob, missing_prob], outputs=[output_file, output_summary], api_name="faker")
+    create_df_btn.click(fn=funcs.create_fake_df, inputs=[number_of_people, number_of_frames, percentage_overlap, random_seed, not_common_appear_once, percentage_duplicates, noise_prob, missing_prob, add_additional_fields], outputs=[output_file, output_summary], api_name="faker")
     
 block.queue(concurrency_count=1).launch(debug=True)
