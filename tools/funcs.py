@@ -23,6 +23,7 @@ def create_fake_df(num_people, frames, overlap_percentage, random_seed, not_comm
     people_master = create_people_master(num_people, fake, add_group, overlap_percentage, duplicates_percentage, random_seed, frames, entry_list)
     people_master_df = pd.DataFrame(people_master)
 
+
     # Sample from the master range and generate
     data_frame_list = []
     data_frame_name_save_list = []
@@ -33,8 +34,11 @@ def create_fake_df(num_people, frames, overlap_percentage, random_seed, not_comm
     for frame_no in range(1,frames+1):
         frame_name = 'f' + str(frame_no)
 
-        frame_common = sample_from_people_master_list(sample_list, num_people, frame_name, duplicates_percentage, is_common=True, random_seed=random_seed, noise_prob=noise_prob, missing_prob=missing_prob)
-        frame_unique = sample_from_people_master_list(sample_list, num_people, frame_name, duplicates_percentage, is_common=False, random_seed=random_seed, noise_prob=noise_prob, missing_prob=missing_prob)
+        frame_number_of_people = int(num_people.iloc[0,frame_no-1])
+        print(frame_number_of_people)
+
+        frame_common = sample_from_people_master_list(sample_list, frame_number_of_people, frame_name, duplicates_percentage, is_common=True, random_seed=random_seed, noise_prob=noise_prob, missing_prob=missing_prob, entry_list=entry_list)
+        frame_unique = sample_from_people_master_list(sample_list, frame_number_of_people, frame_name, duplicates_percentage, is_common=False, random_seed=random_seed, noise_prob=noise_prob, missing_prob=missing_prob, entry_list=entry_list)
 
         # Remove items from sample list that appeared in frame_unique
         if not_common_appear_once == "Yes":
@@ -47,7 +51,7 @@ def create_fake_df(num_people, frames, overlap_percentage, random_seed, not_comm
         # Add duplicates to end of dataframe
         frame_duplicates = pd.DataFrame()
         if duplicates_percentage > 0:
-            number_rows_duplicates = round(num_people*duplicates_percentage)
+            number_rows_duplicates = round(int(num_people.iloc[0,frame_no-1])*duplicates_percentage)
             # Sample duplicates with replacement (so same people can be duplicated multiple times)
             frame_duplicates = data_frame.sample(n=number_rows_duplicates, replace=True)
             frame_duplicates['in_duplicate_set'] = True
@@ -63,7 +67,7 @@ def create_fake_df(num_people, frames, overlap_percentage, random_seed, not_comm
         people_master_df = people_master_df.merge(data_frame_with_dups_j_group, on = 'group', how = 'left')
 
         # Save to csv
-        file_name = frame_name + '_' + str(int(num_people)) + '_seed_' + str(int(random_seed)) + '_overlap_' + str(overlap_percentage) + '.csv'
+        file_name = frame_name + '_' + str(int(num_people.iloc[0,frame_no-1])) + '_seed_' + str(int(random_seed)) + '_overlap_' + str(overlap_percentage) + '.csv'
         data_frame_with_dups.to_csv(file_name, index = None)
 
         data_frame_name_save_list.append(file_name)
@@ -86,7 +90,8 @@ def create_fake_df(num_people, frames, overlap_percentage, random_seed, not_comm
 
     return data_frame_name_save_list, out_message
 
-def sample_from_people_master_list(people_master, num_people, frame_name, duplicates_percentage, is_common, random_seed, noise_prob, missing_prob):
+
+def sample_from_people_master_list(people_master, num_people, frame_name, duplicates_percentage, is_common, random_seed, noise_prob, missing_prob, entry_list):
     people_master_df = pd.DataFrame(people_master)
 
     common_people = people_master_df[people_master_df['common'] == True]
@@ -103,8 +108,10 @@ def sample_from_people_master_list(people_master, num_people, frame_name, duplic
     if is_common == True: 
          sample_range = range(len_common_people)
          sample_size = len(sample_range)
+
     if is_common == False:
          sample_range =  range(len_common_people, len(people_master_df))
+
          sample_size = num_people - len_common_people - len_duplicate_people
 
     print("is_common is ",is_common, " sample size is ", sample_size, " sample range is ", sample_range)
@@ -114,7 +121,7 @@ def sample_from_people_master_list(people_master, num_people, frame_name, duplic
     for n, idx in enumerate(frame_idxs):
         person = {'Within common subset ID': f"{frame_name}-{str(is_common)}-{n+1}"}
         person.update(people_master[idx])
-        frame.append(add_noise(person, random_seed, noise_prob, missing_prob))
+        frame.append(add_noise(person, random_seed, noise_prob, missing_prob, entry_list))
 
     return frame
 
@@ -127,12 +134,31 @@ def create_people_master(num_people, fake, add_group, overlap_percentage, duplic
     
     people_master = []
 
-    duplicate_people = round(duplicates_percentage*num_people)
-    total_people_across_all_frames = (num_people - duplicate_people)*frames
-    common_people = round(overlap_percentage*num_people)
+    duplicate_people = 0
+    total_people_across_all_frames = 0
+    common_people = 0
+
+    num_people = num_people.astype(int)
+    #print(num_people)
+
+    shortest_dataframe = num_people.min().min()
+    common_people = round(overlap_percentage*shortest_dataframe)
+
+    for i in num_people.columns:
+
+        #print(i)
+        #print(num_people[i][0])
+
+        duplicate_people_frame = round(duplicates_percentage*num_people[i][0])
+        total_people_across_all_frames_frame = (num_people[i][0] - duplicate_people)
+
+        duplicate_people = duplicate_people + duplicate_people_frame
+        total_people_across_all_frames = total_people_across_all_frames + total_people_across_all_frames_frame
     
 
     total_unique_people_across_all_frames = total_people_across_all_frames-common_people
+
+    print(total_people_across_all_frames)
 
     for person in range(0, common_people): # Generate people using Faker repo, should be self-explanatory
         entry = create_fake_person(person, fake, cities, city_weights, entry_list, is_common = True)
@@ -146,17 +172,13 @@ def create_people_master(num_people, fake, add_group, overlap_percentage, duplic
     
     return people_master
 
-def add_noise(person, random_seed, noise_prob, missing_prob):
+def add_noise(person, random_seed, noise_prob, missing_prob, entry_list):
         """Adds noise to a person entry."""
         #random.seed(random_seed)
 
         person_out = person.copy()
 
-        keys = ['First Name',
-                    'Surname',
-                    'Dob',
-                    'Address',
-                    'Postcode']
+        keys = entry_list
 
         for key in keys: # Fields to noise
             random_no = random.random()
@@ -233,7 +255,7 @@ def create_fake_person(person, fake, cities, city_weights, entry_list, is_common
 
         if "Last name" in entry_list:
             last_name = fake.last_name()
-            entry_dict['Surname'] =  last_name
+            entry_dict['Last name'] =  last_name
 
         if "Full name" in entry_list:
             if "Title" in entry_list:

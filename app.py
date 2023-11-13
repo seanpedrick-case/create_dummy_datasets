@@ -47,6 +47,20 @@ def update_slider_if_value_greater_than_1(slider_1_value, slider_2_value):
 
     return gr.Slider.update(value=out_value)
 
+import pandas as pd
+
+def update_dataframe_value(frames_number):
+
+    frames = range(1,frames_number + 1)
+    value = [0] * frames_number
+    # Creating a dictionary where keys are column names and values are the data
+    data_dict = {frames[i]: [value[i]] for i in range(len(frames))}
+
+    # Creating the DataFrame
+    df = pd.DataFrame(data_dict)
+
+    return df
+
 ''' Create the gradio interface '''
 
 block = gr.Blocks(theme = gr.themes.Base())
@@ -58,11 +72,11 @@ with block:
     """)
 
     with gr.Accordion(label="Number of data frames and people", open=True):
-        number_of_people = gr.Slider(label = "Number of people in each data frame", value=num_people, minimum=1000, maximum=200000, step=1000)
         number_of_frames = gr.Slider(label = "Number of data frames", value=frames, minimum=1, maximum=10, step=1)
+        number_of_people = gr.Dataframe(label = "Number of people in each data frame", col_count=(frames,'dynamic'), datatype="number", row_count=(1,'fixed'))
 
     with gr.Accordion(label="Repeat people in or across data frames. Default = no repeated people", open=False):
-        percentage_overlap = gr.Slider(label = "What proportion of people are shared across all data frames?", value=0, minimum=0, maximum=1, step=0.05)
+        percentage_overlap = gr.Slider(label = "What proportion of people (of the smallest dataframe) are shared across all data frames?", value=0, minimum=0, maximum=1, step=0.05)
         not_common_appear_once = gr.Dropdown(label = "Are people (not included in the group defined above) unique across all data frames? If no, people will be randomly sampled randomly from the master list and may appear multiple times or not at all across all datasets.", value="Yes", choices=["Yes", "No"])
         percentage_duplicates = gr.Slider(label = "What proportion of each data frame is made up of duplicate people?", value=0, minimum=0, maximum=0.9, step=0.05)
 
@@ -88,6 +102,7 @@ with block:
     # Updates to components
     percentage_overlap.change(fn=update_slider_if_value_greater_than_1, inputs=[percentage_overlap, percentage_duplicates], outputs=[percentage_duplicates])
     percentage_duplicates.change(fn=update_slider_if_value_greater_than_1, inputs=[percentage_duplicates, percentage_overlap], outputs=[percentage_overlap])
+    number_of_frames.change(fn=update_dataframe_value,inputs=[number_of_frames], outputs=[number_of_people])
 
     create_df_btn.click(fn=funcs.create_fake_df, inputs=[number_of_people, number_of_frames, percentage_overlap, random_seed, not_common_appear_once, percentage_duplicates, noise_prob, missing_prob, add_additional_fields], outputs=[output_file, output_summary], api_name="faker")
     
