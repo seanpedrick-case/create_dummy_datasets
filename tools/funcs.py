@@ -150,13 +150,13 @@ def create_people_master(num_people, fake, add_group, overlap_percentage, duplic
         #print(num_people[i][0])
 
         duplicate_people_frame = round(duplicates_percentage*num_people[i][0])
-        total_people_across_all_frames_frame = (num_people[i][0] - duplicate_people)
+        total_people_in_frame = (num_people[i][0] - duplicate_people)
 
         duplicate_people = duplicate_people + duplicate_people_frame
-        total_people_across_all_frames = total_people_across_all_frames + total_people_across_all_frames_frame
+        total_people_across_all_frames = total_people_across_all_frames + total_people_in_frame
     
 
-    total_unique_people_across_all_frames = total_people_across_all_frames-common_people
+    total_unique_people_across_all_frames = total_people_across_all_frames-(common_people*(len(num_people.columns)-1))
 
     print(total_people_across_all_frames)
 
@@ -174,7 +174,7 @@ def create_people_master(num_people, fake, add_group, overlap_percentage, duplic
 
 def add_noise(person, random_seed, noise_prob, missing_prob, entry_list):
         """Adds noise to a person entry."""
-        #random.seed(random_seed)
+        random.seed(random_seed)
 
         person_out = person.copy()
 
